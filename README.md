@@ -43,21 +43,21 @@ You need to upload a directory or multiple files. You need to enter `dired` and 
 
 ## create an session
 ```
-    M-x: ssh-manager-create-ssh-remote
+M-x: ssh-manager-create-ssh-remote
 ```
 
 <a id="org2b497d2"></a>
 
 ## edit an session
 ```
-    M-x: ssh-manager-edit-ssh-session-config
+M-x: ssh-manager-edit-ssh-session-config
 ```
 
 <a id="org7bfe22d"></a>
 
 ## remove an session
 ```
-    M-x: ssh-manager-remove-ssh-server
+M-x: ssh-manager-remove-ssh-server
 ```
 
 <a id="org9746ee9"></a>
@@ -79,7 +79,7 @@ You need to upload a directory or multiple files. You need to enter `dired` and 
 -   upload muilt file to server
 -   download a file to local /tmp
 ```
-    M-x: ssh-manager-upload-or-download-files-to-remote-host
+M-x: ssh-manager-upload-or-download-files-to-remote-host
 ```
 
 <a id="orgdb7d181"></a>
