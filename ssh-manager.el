@@ -268,7 +268,7 @@ yet."
                      (setq argv (append argv `("-o" ,totp-key))))
                  (if (not (string-empty-p totp-message))
                      (setq argv (append argv `("-O" ,totp-message))))
-                 (if (length> argv 0)
+                 (if (>= (length argv) 0)
                      (let ((remote-server (format "%s@%s" username host))
                            (proxy-server (format "%s@%s:%s" proxy-user proxy-host proxy-port)))
                        (setq term-argv
