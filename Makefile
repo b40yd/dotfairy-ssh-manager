@@ -19,29 +19,28 @@ all: clean compile lint
 
 compile:$(TARGETS)
 
-.PHONY: compile
+lint:
+	$(CASK) exec $(EMACS) -Q -batch	\
+	--eval "(require 'package)"	\
+	--eval "(push '(\"melpa\" . \"https://melpa.org/packages/\") package-archives)"	\
+	--eval "(package-initialize)" \
+	--eval "(package-refresh-contents)" -l package-lint.el -f package-lint-batch-and-exit $(SOURCES)
 
 test:$(TARGETS)
 ifeq ($(SELECTOR),)
-	$(CASK) exec $(EMACS) -Q --batch -L . $(addprefix -l , $(TESTS)) -f ert-run-tests-batch-and-exit
+	$(CASK) exec $(EMACS) -Q -batch -L . $(addprefix -l , $(TESTS)) -f ert-run-tests-batch-and-exit
 else
-	$(CASK) exec $(EMACS) -Q --batch -L . $(addprefix -l , $(TESTS)) --eval "(ert-run-tests-batch-and-exit '$(SELECTOR))"
+	$(CASK) exec $(EMACS) -Q -batch -L . $(addprefix -l , $(TESTS)) --eval "(ert-run-tests-batch-and-exit '$(SELECTOR))"
 endif
 
 help:
 	@echo make
 	@echo make compile
 	@echo make test [SELECTOR]
+	@echo make lint
 	@echo make clean
-
-lint:
-	$(CASK) exec $(EMACS) -Q -batch													\
-	--eval "(require 'package)"														\
-	--eval "(push '(\"melpa\" . \"https://melpa.org/packages/\") package-archives)"	\
-	--eval "(package-initialize)"													\
-	--eval "(package-refresh-contents)"												\
-	-l package-lint.el																\
-	-f package-lint-batch-and-exit ssh-manager.el
 
 clean:
 	@rm -f *.elc
+
+.PHONY: compile

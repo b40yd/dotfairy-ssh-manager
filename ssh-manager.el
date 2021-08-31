@@ -1,4 +1,4 @@
-;;; ssh-manager.el ---                                   -*- lexical-binding: t; -*-
+;;; ssh-manager.el --- A SSH manager remote servers  tools -*- lexical-binding: t -*-
 
 ;; Copyright © 2021, 7ym0n, all rights reserved.
 
@@ -27,6 +27,7 @@
 ;; It's like `xshell', `mobaxterm' or other tools same work.
 
 ;;; Code:
+
 (require 'cl-generic)
 (require 'cl-lib)
 (require 'dash)
@@ -71,10 +72,8 @@
 (defun ssh-manager-remove-ssh-session-from-groups (session)
   "Remove ssh server session from groups."
   (interactive  (list (completing-read "Select server to connect: "
-                                       (ssh-manager-session-groups-servers (ssh-manager-session-groups))
-                                       )))
-  (ssh-manager--remove-buffer-name-from-groups session)
-  )
+                                       (ssh-manager-session-groups-servers (ssh-manager-session-groups)))))
+  (ssh-manager--remove-buffer-name-from-groups session))
 
 (defun ssh-manager-send-cmd-to-session-groups (cmd)
   (let ((current-buf (current-buffer)))
@@ -92,7 +91,8 @@
 (define-key ssh-manager-mode-map (kbd "C-c C-.") 'ssh-manager-execute-current-line-cmd-to-ssh)
 
 (define-derived-mode ssh-manager-mode prog-mode "SSH Manager Mode"
-  (font-lock-fontify-buffer)
+  (with-no-warnings
+    (font-lock-fontify-buffer))
   (use-local-map ssh-manager-mode-map))
 
 (defun ssh-manager-execute-current-line-cmd-to-ssh ()
@@ -100,8 +100,7 @@
   (interactive)
   (let ((line (ssh-manager-read-current-line-cmd)))
     (ssh-manager-send-cmd-to-session-groups line)
-    (reindent-then-newline-and-indent)
-    ))
+    (reindent-then-newline-and-indent)))
 
 (defun ssh-manager-read-current-line-cmd ()
   "Read current line command."
@@ -120,8 +119,7 @@
 (defun ssh-manager-execute-buffer-cmd-to-ssh ()
   "Execute buffer cmd to ssh"
   (interactive)
-  (ssh-manager-send-cmd-to-session-groups (buffer-substring-no-properties (point-min) (point-max)))
-  )
+  (ssh-manager-send-cmd-to-session-groups (buffer-substring-no-properties (point-min) (point-max))))
 
 (defun ssh-manager ()
   (interactive)
@@ -210,8 +208,7 @@ yet."
     (set-process-sentinel (get-buffer-process (current-buffer))
                           (lambda (proc change)
                             (when (string-match "\\(finished\\|exited\\)" change)
-                              (kill-buffer (process-buffer proc)))
-                            ))))
+                              (kill-buffer (process-buffer proc)))))))
 
 (defun ssh-manager--init-term-mode (term-name)
   "Init term mode"
@@ -249,8 +246,7 @@ yet."
                      (with-temp-buffer
                        (or (apply #'call-process "oathtool" nil t nil (list "--totp" "-b" (plist-get server :totp-key)))
                            "")
-                       (string-trim (buffer-string)))
-                     ))
+                       (string-trim (buffer-string)))))
          (totp-message (if (string-empty-p (plist-get server :totp-message))
                            ""
                          (format "%s" (plist-get server :totp-message))))
@@ -284,8 +280,7 @@ yet."
                                "-p"
                                ,port
                                "-J"
-                               ,proxy-server))
-                       )
+                               ,proxy-server)))
                    (setq term-argv
                          (list "-p"
                                password
@@ -299,8 +294,7 @@ yet."
                                     "sshpass"
                                     nil
                                     term-argv))
-                 (docker--init-term-mode term-name)
-                 ))))
+                 (ssh-manager--init-term-mode term-name)))))
           ((string= kind "direct")
            (let* ((argv '())
                   (term-name (format "%s<%s>" session-name index)))
@@ -322,8 +316,7 @@ yet."
                                         "sshpass"
                                         nil
                                         argv))
-                     (docker--init-term-mode term-name))))
-             )))))
+                     (ssh-manager--init-term-mode term-name)))))))))
 
 
 (defun ssh-managerterm-kill-buffer-hook ()
@@ -336,7 +329,8 @@ yet."
       (term-quit-subjob))
     (ssh-manager--info "removed %s from server groups." (buffer-name (current-buffer)))
     (ssh-manager--remove-buffer-name-from-groups (buffer-name (current-buffer)))
-    (switch-to-buffer "*scratch*")))
+    ;; (switch-to-buffer "*scratch*")
+    ))
 
 (defun ssh-manager--send-cmd-to-buffer (&optional buffer string)
   "Send STRING to a shell process associated with BUFFER.
@@ -363,21 +357,18 @@ By default, BUFFER is \"*terminal*\" and STRING is empty."
 (defun ssh-manager-switch-to-server (session)
   "Select ssh server to connect."
   (interactive (list (completing-read "Select server to connect: "
-                                      (ssh-manager--filter-ssh-session)
-                                      )))
+                                      (ssh-manager--filter-ssh-session))))
   (dolist (server (->> (ssh-manager-session)
                        (ssh-manager-session-servers)))
     (if (equal (plist-get server :session-name) session)
-        (ssh-manager-connect-ssh server)
-      )))
+        (ssh-manager-connect-ssh server))))
 
 
 (defun ssh-manager--read-session-config-from-minibuffer (kind &optional ssh-session-config)
   "Read session config from minibuffer."
   (let* ((ssh-session '())
          (session-name (read-string "Session Name: " (if (not (equal ssh-session-config nil))
-                                                         (plist-get ssh-session-config :session-name))
-                                    )))
+                                                         (plist-get ssh-session-config :session-name)))))
     (if (string-empty-p session-name)
         (ssh-manager--error "session name cannot empty.")
       (setq ssh-session (plist-put ssh-session :session-name session-name))
@@ -395,8 +386,7 @@ By default, BUFFER is \"*terminal*\" and STRING is empty."
                                                                    proxy-port)))
             (setq ssh-session (plist-put ssh-session :proxy-user (if (string-empty-p proxy-user)
                                                                      "root"
-                                                                   proxy-user)))
-            ))
+                                                                   proxy-user)))))
       (let* ((remote-host (read-string "Remote hostname: " (if (not (equal ssh-session-config nil))
                                                                (plist-get ssh-session-config :remote-host))))
              (remote-port (read-string "Remote hostport(22): " (if (not (equal ssh-session-config nil))
@@ -404,7 +394,7 @@ By default, BUFFER is \"*terminal*\" and STRING is empty."
              (remote-user (read-string "Remote username(root): " (if (not (equal ssh-session-config nil))
                                                                      (plist-get ssh-session-config :remote-user))))
              (remote-password (read-passwd "Remote password: "))
-             (totp-key (read-string "2FA(TOTP) key: " (if (not (equal ssh-session-config nil))
+             (totp-key (read-passwd "2FA(TOTP) key: " (if (not (equal ssh-session-config nil))
                                                           (plist-get ssh-session-config :totp-key))))
              (totp-message (read-string "2FA(TOTP) message: " (if (not (equal ssh-session-config nil))
                                                                   (plist-get ssh-session-config :totp-message)))))
@@ -422,10 +412,8 @@ By default, BUFFER is \"*terminal*\" and STRING is empty."
                                                                           passwd))
                                                                     remote-password)))
         (setq ssh-session (plist-put ssh-session :totp-key totp-key))
-        (setq ssh-session (plist-put ssh-session :totp-message totp-message))
-        ))
-    ssh-session)
-  )
+        (setq ssh-session (plist-put ssh-session :totp-message totp-message))))
+    ssh-session))
 
 (defun ssh-manager-create-ssh-remote (kind)
   "docstring"
@@ -442,34 +430,28 @@ By default, BUFFER is \"*terminal*\" and STRING is empty."
           ((string= (plist-get ssh-session :kind) "direct")
            (if (string-empty-p (plist-get ssh-session :remote-host))
                (ssh-manager--error "<Remote host> must be set. it's cannot empty.")
-             (ssh-manager-connect-ssh ssh-session)))))
-  )
+             (ssh-manager-connect-ssh ssh-session))))))
 
 
 (defun ssh-manager-edit-ssh-session-config (session)
   "Edit ssh session config."
   (interactive (list (completing-read "Select server to edit: "
-                                      (ssh-manager--filter-ssh-session)
-                                      )))
+                                      (ssh-manager--filter-ssh-session))))
 
   (dolist (server (->> (ssh-manager-session)
                        (ssh-manager-session-servers)))
     (if (string= session (plist-get server :session-name))
         (let* ((let-sessions (ssh-manager-session)))
           (cl-pushnew (ssh-manager--read-session-config-from-minibuffer (completing-read "Select connect style: " '(proxy direct))
-                                                                     server)
+                                                                        server)
                       (ssh-manager-session-servers (ssh-manager-session)) :test 'equal)
           (setf (ssh-manager-session-servers let-sessions)
-                (-remove-item server (ssh-manager-session-servers let-sessions)))
-          )
-      ))
-  )
+                (-remove-item server (ssh-manager-session-servers let-sessions)))))))
 
 (defun ssh-manager-remove-ssh-server (session)
   "Remove session from the list of servers."
   (interactive (list (completing-read "Select server to connect: "
-                                      (ssh-manager--filter-ssh-session)
-                                      )))
+                                      (ssh-manager--filter-ssh-session))))
   (dolist (server (->> (ssh-manager-session)
                        (ssh-manager-session-servers)))
     (if (string= session (plist-get server :session-name))
@@ -521,8 +503,7 @@ By default, BUFFER is \"*terminal*\" and STRING is empty."
                     (with-temp-buffer
                       (or (apply #'call-process "oathtool" nil t nil (list "--totp" "-b" (plist-get server :totp-key)))
                           "")
-                      (string-trim (buffer-string)))
-                    ))
+                      (string-trim (buffer-string)))))
         (totp-message (plist-get server :totp-message))
         (proxy-host (plist-get server :proxy-host))
         (proxy-port (plist-get server :proxy-port))
@@ -562,14 +543,11 @@ By default, BUFFER is \"*terminal*\" and STRING is empty."
                                (when-let ((ask (downcase (read-string "upload current buffer file(y-or-n):"))))
                                  (if (or (string= ask "y")
                                          (string= ask "yes"))
-                                     (setq argv (append argv `(,(buffer-file-name) ,(format "%s@%s:%s" user host remote-dir-or-file))))
-                                   ))
+                                     (setq argv (append argv `(,(buffer-file-name) ,(format "%s@%s:%s" user host remote-dir-or-file))))))
                              (if (not (string-empty-p remote-dir-or-file))
-                                 (setq argv (append argv `(,@files ,(format "%s@%s:%s" user host remote-dir-or-file)))))
-                             ))
+                                 (setq argv (append argv `(,@files ,(format "%s@%s:%s" user host remote-dir-or-file)))))))
                           ((string= method "download")
-                           (setq argv (append argv `(,(format "%s@%s:%s" user host remote-dir-or-file) ,(dired-current-directory))))))
-                    ))))))))
+                           (setq argv (append argv `(,(format "%s@%s:%s" user host remote-dir-or-file) ,(dired-current-directory))))))))))))))
 
 
 ;;;###autoload
@@ -603,22 +581,14 @@ Warning: freezes indefinitely on any stdin prompt."
 (defun ssh-manager-upload-or-download-files-to-remote-host (method)
   "SCP files send to remote host"
   (interactive (list (completing-read "Select upload or download: "
-                                      '(upload download)
-                                      )))
+                                      '(upload download))))
   (let ((session-name (completing-read "Select server to connect: "
-                                       (ssh-manager--filter-ssh-session)
-                                       )))
+                                       (ssh-manager--filter-ssh-session))))
     (dolist (session (->> (ssh-manager-session)
                           (ssh-manager-session-servers)))
       (if (string= session-name (plist-get session :session-name))
           (if-let ((argv (ssh-manager--upload-or-download-files-to-remote-host session method)))
-              (apply 'ssh-manager-exec-process "sshpass" argv)
-            )))))
-
-(with-eval-after-load 'dired
-  (progn
-    (define-key dired-mode-map (kbd "C-c C-<return>") 'ssh-manager-upload-or-download-files-to-remote-host)
-    ))
+              (apply 'ssh-manager-exec-process "sshpass" argv))))))
 
 (provide 'ssh-manager)
 ;;; ssh-manager.el ends here
