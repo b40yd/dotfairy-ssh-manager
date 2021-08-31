@@ -22,6 +22,30 @@ using package:
         (progn
             (define-key dired-mode-map (kbd "C-c C-<return>") 'ssh-manager-upload-or-download-files-to-remote-host)))))
 ```
+## Depends
+- [sshpass](https://github.com/dora38/sshpass.git)
+- oathtool
+- scp
+- ssh
+
+You can install sshpass through `ssh-manager-install-tools`.
+
+MacOS:
+```
+brew install oath-tookit
+# or
+port install oath-tookit
+```
+
+Archlinux:
+```
+sudo pacman -Syy oath-tookit
+```
+
+debian:
+```
+sudo apt-get install oath-tookit
+```
 
 # Usage
 
