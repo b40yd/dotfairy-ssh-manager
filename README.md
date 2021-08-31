@@ -11,17 +11,16 @@ using package:
 ```elisp
 (use-package ssh-manager
     :bind (("C-c m s s" . ssh-manager-switch-to-server)
-    ("C-c m s c" . ssh-manager-create-ssh-remote)
-    ("C-c m s d" . ssh-manager-remove-ssh-server)
-    ("C-c m s e" . ssh-manager-edit-ssh-session-config)
-    ("C-c m s u" . ssh-manager-upload-or-download-files-to-remote-host)
-    ("C-c m s m" . ssh-manager)
-    ("C-c M-s" . ssh-manager-show-ssh-session-groups)
+        ("C-c m s c" . ssh-manager-create-ssh-remote)
+        ("C-c m s d" . ssh-manager-remove-ssh-server)
+        ("C-c m s e" . ssh-manager-edit-ssh-session-config)
+        ("C-c m s u" . ssh-manager-upload-or-download-files-to-remote-host)
+        ("C-c m s m" . ssh-manager)
+        ("C-c M-s" . ssh-manager-show-ssh-session-groups)
     :config
     (with-eval-after-load 'dired
         (progn
-            (define-key dired-mode-map (kbd "C-c C-<return>") 'ssh-manager-upload-or-download-files-to-remote-host)))
-            ))
+            (define-key dired-mode-map (kbd "C-c C-<return>") 'ssh-manager-upload-or-download-files-to-remote-host)))))
 ```
 
 # Usage
@@ -43,23 +42,23 @@ You need to upload a directory or multiple files. You need to enter `dired` and 
 <a id="org1b67949"></a>
 
 ## create an session
-
+```
     M-x: ssh-manager-create-ssh-remote
-
+```
 
 <a id="org2b497d2"></a>
 
 ## edit an session
-
+```
     M-x: ssh-manager-edit-ssh-session-config
-
+```
 
 <a id="org7bfe22d"></a>
 
 ## remove an session
-
+```
     M-x: ssh-manager-remove-ssh-server
-
+```
 
 <a id="org9746ee9"></a>
 
@@ -79,9 +78,9 @@ You need to upload a directory or multiple files. You need to enter `dired` and 
 -   upload a file to test server
 -   upload muilt file to server
 -   download a file to local /tmp
-
+```
     M-x: ssh-manager-upload-or-download-files-to-remote-host
-
+```
 
 <a id="orgdb7d181"></a>
 
