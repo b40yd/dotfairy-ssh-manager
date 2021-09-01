@@ -7,15 +7,16 @@
 Use SSH to manage remote servers like `xshell`, `mobaxterm` or other tools.
 
 # Feature
-[x] support session manager
-[x] support save session to file
-[x] support 2FA(TOTP)
-[x] support batch session execute command
-[x] support upload and download
+
+- [x] support session manager
+- [x] support save session to file
+- [x] support 2FA(TOTP)
+- [x] support batch session execute command
+- [x] support upload and download
 
 # TODOs
-[ ] Optimize upload and download, UI progress display
-[ ] support other solution
+- [ ] Optimize upload and download, UI progress display
+- [ ] support other solution
 
 # Install
 using package:
