@@ -6,6 +6,17 @@
 # dotfairy-ssh-manager
 Use SSH to manage remote servers like `xshell`, `mobaxterm` or other tools.
 
+# Feature
+[x] support session manager
+[x] support save session to file
+[x] support 2FA(TOTP)
+[x] support batch session execute command
+[x] support upload and download
+
+# TODOs
+[ ] Optimize upload and download, UI progress display
+[ ] support other solution
+
 # Install
 using package:
 ```elisp
@@ -30,7 +41,7 @@ using package:
 
 Notes:
 
-    choice  scp upload or download files, it's don't show progress.
+    choice scp upload or download files, it's don't show progress.
 
 You can install sshpass through `ssh-manager-install-tools`.
 
