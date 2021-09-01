@@ -552,7 +552,6 @@ By default, BUFFER is \"*terminal*\" and STRING is empty."
                                (setq argv (append argv `(,(format "%s@%s:%s" user host remote-dir-or-file) ,(dired-current-directory))))
                              (setq argv (append argv `(,(format "%s@%s:%s" user host remote-dir-or-file) ,default-directory))))))))))))))
 
-;;;###autoload
 (defun ssh-manager--replace-in-string (what with in)
   (replace-regexp-in-string (regexp-quote what) with in nil 'literal))
 
