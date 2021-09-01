@@ -25,8 +25,11 @@ using package:
 ## Depends
 - [sshpass](https://github.com/dora38/sshpass.git)
 - oathtool
-- scp
+- rsync or scp
 - ssh
+
+  notes:
+      select scp upload or download files, it's not progress.
 
 You can install sshpass through `ssh-manager-install-tools`.
 
