@@ -28,8 +28,9 @@ using package:
 - rsync or scp
 - ssh
 
-  notes:
-      select scp upload or download files, it's not progress.
+Notes:
+
+    choice  scp upload or download files, it's don't show progress.
 
 You can install sshpass through `ssh-manager-install-tools`.
 
