@@ -547,8 +547,9 @@ By default, BUFFER is \"*terminal*\" and STRING is empty."
                              (if (not (string-empty-p remote-dir-or-file))
                                  (setq argv (append argv `(,@files ,(format "%s@%s:%s" user host remote-dir-or-file)))))))
                           ((string= method "download")
-                           (setq argv (append argv `(,(format "%s@%s:%s" user host remote-dir-or-file) ,(dired-current-directory))))))))))))))
-
+                           (if (derived-mode-p 'dired-mode)
+                               (setq argv (append argv `(,(format "%s@%s:%s" user host remote-dir-or-file) ,(dired-current-directory))))
+                             (setq argv (append argv `(,(format "%s@%s:%s" user host remote-dir-or-file) ,default-directory))))))))))))))
 
 ;;;###autoload
 (defun ssh-manager-exec-process (command &rest args)
@@ -588,7 +589,10 @@ Warning: freezes indefinitely on any stdin prompt."
                           (ssh-manager-session-servers)))
       (if (string= session-name (plist-get session :session-name))
           (if-let ((argv (ssh-manager--upload-or-download-files-to-remote-host session method)))
-              (apply 'ssh-manager-exec-process "sshpass" argv))))))
+              (apply 'ssh-manager-exec-process "sshpass" argv))))
+    (if (and (string= method "download")
+             (derived-mode-p 'dired-mode))
+        (revert-buffer))))
 
 (provide 'ssh-manager)
 ;;; ssh-manager.el ends here
