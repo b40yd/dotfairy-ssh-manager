@@ -124,6 +124,3 @@ M-x: ssh-manager-upload-or-download-files-to-remote-host
 ```
 
 <a id="orgdb7d181"></a>
-
-# Screenshot
-![](ssh-manager.gif)
