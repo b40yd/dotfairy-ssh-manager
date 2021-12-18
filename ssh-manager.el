@@ -741,5 +741,5 @@ Warning: freezes indefinitely on any stdin prompt."
               ((string= method "upload")
                (dired-unmark-all-marks))))))
 
-(provide 'init-ssh)
+(provide 'ssh-manager)
 ;;; ssh-manager.el ends here
