@@ -26,6 +26,7 @@
 ;; A ssh session manager and files upload or download tools for Emacs.
 ;; It's like `xshell', `mobaxterm' or other tools same work.
 
+;;; Code:
 
 (require 'cl-generic)
 (require 'cl-lib)
@@ -34,8 +35,6 @@
 (require 'f)
 (require 'dired)
 (require 'subr-x)
-
-;;; Code:
 
 (defcustom ssh-manager-sessions '()
   "Set SSH connect session."
@@ -53,6 +52,8 @@
            :totp-kind "FreeOTP" ; default '(FreeOTP custom)
            :totp-key ""
            :totp-message "verification code:")))
+
+
 
 (defcustom ssh-manager-totp-hooks '((:name "FreeOTP"
                                      :function (lambda (&rest args)
@@ -85,7 +86,7 @@ Optional argument ARGS TOTP handler function args."
       (if (string= name  (plist-get hook :name))
           (setq fun (plist-get hook :function))))
     (if (not (equal fun nil))
-        (funcall fun args))))
+        (apply fun args))))
 
 ;; ssh-manager-mode
 (cl-defstruct ssh-manager-session-groups
