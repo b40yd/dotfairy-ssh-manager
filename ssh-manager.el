@@ -542,10 +542,7 @@ Optional argument SSH-SESSION-CONFIG set session config."
                 :remote-user ,(if (string-empty-p remote-user)
                                   "root"
                                 remote-user)
-                :remote-password ,(if (and (string-empty-p remote-password)
-                                           (not (string= kind 'proxy)))
-                                      (ssh-manager--error "Remote connect password cannot empty. ")
-                                    remote-password)
+                :remote-password ,remote-password
                 :totp-kind ,totp-kind
                 :totp-key ,totp-key
                 :totp-message ,totp-message))))
