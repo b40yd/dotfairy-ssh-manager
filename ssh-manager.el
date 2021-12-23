@@ -263,13 +263,13 @@ yet."
                               (kill-buffer (process-buffer proc)))))))
 
 ;;; This code is referenced from multi-term.el
-(defcustom ssh-manager--term-unbind-key-list
+(defcustom ssh-manager-term-unbind-key-list
   '("C-z" "C-x" "C-c" "C-h" "C-y" "<ESC>")
   "The key list that will need to be unbind."
   :type 'list
   :group 'ssh-manager)
 
-(defcustom ssh-manager--term-bind-key-alist
+(defcustom ssh-manager-term-bind-key-alist
   '(
     ("C-c C-c" . term-interrupt-subjob)
     ("<escape>" . ssh-manager-term-send-esc)
@@ -328,7 +328,7 @@ By default, the key bindings of `term-char-mode' conflict with user's keystroke.
   and binds some keystroke with `term-raw-map'."
   (let (bind-key bind-command)
     ;; Unbind base key that conflict with user's keys-tokes.
-    (cl-dolist (unbind-key ssh-manager--term-unbind-key-list)
+    (cl-dolist (unbind-key ssh-manager-term-unbind-key-list)
       (cond
        ((stringp unbind-key) (setq unbind-key (read-kbd-macro unbind-key)))
        ((vectorp unbind-key) nil)
@@ -337,7 +337,7 @@ By default, the key bindings of `term-char-mode' conflict with user's keystroke.
     ;; Add some i use keys.
     ;; If you don't like my keystroke,
     ;; just modified `term-bind-key-alist'
-    (cl-dolist (element ssh-manager--term-bind-key-alist)
+    (cl-dolist (element ssh-manager-term-bind-key-alist)
       (setq bind-key (car element))
       (setq bind-command (cdr element))
       (cond
