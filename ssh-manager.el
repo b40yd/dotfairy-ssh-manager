@@ -23,7 +23,7 @@
 
 ;;; Commentary:
 ;;
-;; A ssh session manager and files upload or download tools for Emacs.
+;; A SSH session manager and files upload or download tools for Emacs.
 ;; It's like `xshell', `mobaxterm' or other tools same work.
 
 ;;; Code:
@@ -402,9 +402,9 @@ Argument TERM-NAME set name."
           (setq argv (append argv `("-O" ,totp-message))))
       (setq argv (append argv `("ssh" "-o" "StrictHostKeychecking=no")))
       (if (not (string-empty-p username))
-          (setq argv (append argv `(,(format "%s@" username)))))
+          (setq username (format "%s@" username)))
       (if (not (string-empty-p host))
-          (setq argv (append argv `(,(format "%s" host))))
+          (setq argv (append argv `(,(format "%s%s" username host))))
         (ssh-manager--error "SSH hostname must be set. it cannot empty. "))
       (if (not (string-empty-p port))
           (setq argv (append argv `("-p" ,port))))
