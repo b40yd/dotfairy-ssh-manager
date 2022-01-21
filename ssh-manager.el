@@ -499,7 +499,7 @@ Optional argument SSH-SESSION-CONFIG set session config."
         (ssh-manager--error "Session name cannot empty. ")
       (let* ((kind (completing-read "Select connect style: " '(proxy direct)))
              (proxy-kind (if (string= kind 'proxy)
-                             (completing-read "Select TOTP kind: " '("other" "jumpserver"))))
+                             (completing-read "Select proxy kind: " '("other" "jumpserver"))))
              (proxy-host (if (string= kind 'proxy)
                              (read-string "Proxy hostname: "
                                           (if (not (equal ssh-session-config nil))
@@ -515,7 +515,8 @@ Optional argument SSH-SESSION-CONFIG set session config."
                                           (if (not (equal ssh-session-config nil))
                                               (plist-get ssh-session-config :proxy-user)))
                            ""))
-             (proxy-password (if (string= kind 'proxy)
+             (proxy-password (if (and (string= kind 'proxy)
+                                      (not (string= proxy-kind "jumpserver")))
                                  (read-passwd "Proxy password: "
                                               (if (not (equal ssh-session-config nil))
                                                   (plist-get ssh-session-config :proxy-password)))
@@ -526,7 +527,8 @@ Optional argument SSH-SESSION-CONFIG set session config."
                                                                    (plist-get ssh-session-config :remote-port))))
              (remote-user (read-string "Remote username(root): " (if (not (equal ssh-session-config nil))
                                                                      (plist-get ssh-session-config :remote-user))))
-             (remote-password (read-passwd "Remote password: "))
+             (remote-password (if (not (string= proxy-kind "jumpserver"))
+                                  (read-passwd "Remote password: ")))
              (totp-enable (y-or-n-p "Are you use TOTP? "))
              (totp-kind (if totp-enable
                             (completing-read "Select TOTP kind: "
@@ -551,7 +553,8 @@ Optional argument SSH-SESSION-CONFIG set session config."
                                  "root"
                                proxy-user)
                 :proxy-password ,(if (and (string-empty-p proxy-password)
-                                          (string= kind 'proxy))
+                                          (string= kind 'proxy)
+                                          (not (string= proxy-kind "jumpserver")))
                                      (ssh-manager--error "Proxy connect password cannot empty. ")
                                    proxy-password)
                 :remote-host ,remote-host
@@ -774,13 +777,15 @@ Argument METHOD select download or upload."
                                        (ssh-manager--filter-ssh-session))))
     (dolist (session (->> (ssh-manager-session)
                           (ssh-manager-session-servers)))
-      (if (string= session-name (plist-get session :session-name))
+      (if (and (string= session-name (plist-get session :session-name))
+               (not (string= (plist-get session :proxy-kind) "jumpserver")))
           (cond ((executable-find "rsync")
                  (if-let ((argv (ssh-manager--upload-or-download-files session method "rsync")))
                      (ssh-manager-exec-process "sh" "-c" (mapconcat 'identity argv " "))))
                 ((executable-find "scp")
                  (if-let ((argv (ssh-manager--upload-or-download-files session method "scp")))
-                     (ssh-manager-exec-process "sh" "-c" (mapconcat 'identity argv " ")))))))
+                     (ssh-manager-exec-process "sh" "-c" (mapconcat 'identity argv " ")))))
+        (ssh-manager--error "jumpserver not support download and upload.")))
     (if (derived-mode-p 'dired-mode)
         (cond ((string= method "download")
                (revert-buffer))
