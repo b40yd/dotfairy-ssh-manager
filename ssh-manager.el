@@ -27,8 +27,6 @@
 ;; It's like `xshell', `mobaxterm' or other tools same work.
 
 ;;; Code:
-
-
 (require 'cl-generic)
 (require 'cl-lib)
 (require 'dash)
@@ -101,16 +99,19 @@ Optional argument ARGS TOTP handler function args."
   "Get all session by group."
   (or ssh-manager--session-groups (setq ssh-manager--session-groups (make-ssh-manager-session-groups))))
 
+;;;###autoload
 (defun ssh-manager-show-ssh-session-groups ()
   "Show SSH server groups."
   (interactive)
   (print (ssh-manager-session-groups-servers (ssh-manager-session-groups))))
 
+;;;###autoload
 (defun ssh-manager-add-this-ssh-session-to-groups ()
   "Add this SSH server session to groups."
   (interactive)
   (cl-pushnew (buffer-name) (ssh-manager-session-groups-servers (ssh-manager-session-groups)) :test 'equal))
 
+;;;###autoload
 (defun ssh-manager-remove-this-ssh-session-from-groups ()
   "Remove this SSH server session from groups."
   (interactive)
@@ -123,6 +124,7 @@ Argument BUF-NAME select buffer name."
   (setf (ssh-manager-session-groups-servers (ssh-manager-session-groups))
         (-remove-item buf-name (ssh-manager-session-groups-servers (ssh-manager-session-groups)))))
 
+;;;###autoload
 (defun ssh-manager-remove-ssh-session-from-groups (session)
   "Remove SSH server SESSION from groups."
   (interactive  (list (completing-read "Select server to connect: "
@@ -149,6 +151,7 @@ Argument BUF-NAME select buffer name."
     (font-lock-fontify-buffer))
   (use-local-map ssh-manager-mode-map))
 
+;;;###autoload
 (defun ssh-manager-execute-current-line-cmd-to-ssh ()
   "Execute command to SSH server groups."
   (interactive)
@@ -156,6 +159,7 @@ Argument BUF-NAME select buffer name."
     (ssh-manager-send-cmd-to-session-groups line)
     (reindent-then-newline-and-indent)))
 
+;;;###autoload
 (defun ssh-manager-read-current-line-cmd ()
   "Read current line command."
   (interactive)
@@ -163,6 +167,7 @@ Argument BUF-NAME select buffer name."
    (line-beginning-position)
    (line-end-position)))
 
+;;;###autoload
 (defun ssh-manager-execute-region-cmd-to-ssh ()
   "Execute region cmd to SSH."
   (interactive)
@@ -170,11 +175,13 @@ Argument BUF-NAME select buffer name."
         (end (region-end)))
     (ssh-manager-send-cmd-to-session-groups (buffer-substring begin end))))
 
+;;;###autoload
 (defun ssh-manager-execute-buffer-cmd-to-ssh ()
   "Execute buffer cmd to SSH."
   (interactive)
   (ssh-manager-send-cmd-to-session-groups (buffer-substring-no-properties (point-min) (point-max))))
 
+;;;###autoload
 (defun ssh-manager ()
   "Enable SSH manager mode."
   (interactive)
@@ -462,6 +469,7 @@ By default, BUFFER is \"*terminal*\" and STRING is empty."
       (setq lst (append lst (list (plist-get server :session-name)))))
     lst))
 
+;;;###autoload
 (defun ssh-manager-switch-to-server (session)
   "Select SSH server to connect.
 Argument SESSION server session info."
@@ -559,6 +567,7 @@ Optional argument SSH-SESSION-CONFIG set session config."
                 :totp-message ,totp-message))))
     ssh-session))
 
+;;;###autoload
 (defun ssh-manager-create-ssh-remote ()
   "Create and connect SSH session."
   (interactive)
@@ -576,7 +585,7 @@ Optional argument SSH-SESSION-CONFIG set session config."
                (ssh-manager--error "<Remote host> must be set. it cannot empty. ")
              (ssh-manager-connect-ssh ssh-session))))))
 
-
+;;;###autoload
 (defun ssh-manager-edit-ssh-session-config (session)
   "Edit SSH SESSION config."
   (interactive (list (completing-read "Select server to edit: "
@@ -594,6 +603,7 @@ Optional argument SSH-SESSION-CONFIG set session config."
           (-remove-item let-server (ssh-manager-session-servers let-sessions)))
     (ssh-manager--persist-session let-sessions)))
 
+;;;###autoload
 (defun ssh-manager-remove-ssh-server (session)
   "Remove SESSION from the list of servers."
   (interactive (list (completing-read "Select server to connect: "
@@ -606,6 +616,7 @@ Optional argument SSH-SESSION-CONFIG set session config."
                 (-remove-item server (ssh-manager-session-servers let-sessions)))
           (ssh-manager--persist-session (ssh-manager-session))))))
 
+;;;###autoload
 (defun ssh-manager-remove-history-file-from-ssh-server (history)
   "Remove HISTORY file from the list of folders."
   (interactive (list (completing-read "Select remove from folders: "
@@ -621,6 +632,7 @@ Optional argument SSH-SESSION-CONFIG set session config."
   :type 'string)
 (defvar ssh-manager-sshpass-bin (concat ssh-manager-sshpass-path "/bin/sshpass"))
 
+;;;###autoload
 (defun ssh-manager-install-tools ()
   "Install SSH manager tools."
   (interactive)
@@ -752,7 +764,7 @@ Argument CMD use rsync or scp."
                      (setq argv (append argv `(,(format "%s@%s:%s" user host remote-dir-or-file) ,(dired-current-directory))))
                    (setq target (read-file-name "Set download to: "))
                    (setq argv (append argv `(,(format "%s@%s:%s" user host remote-dir-or-file) ,target))))))))))
-
+;;;###autoload
 (defun ssh-manager-upload-or-download-files-to-remote-host (method)
   "SSH upload or download files.
 Argument METHOD select download or upload."
