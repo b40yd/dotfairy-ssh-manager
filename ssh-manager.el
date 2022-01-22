@@ -409,8 +409,8 @@
          (host (plist-get server :realhost))
          (totp-key (ssh-manager-lookup-totp-func (plist-get server :totp-kind)
                                                  (plist-get server :totp-key)))
-         (totp-message (if (eq (plist-get server :totp-message) nil)
-                           ""
+         (totp-message (if (string= (plist-get server :totp-message) nil)
+                           nil
                          (format "%s" (plist-get server :totp-message))))
          (proxy-kind (plist-get server :proxy-kind))
          (proxy-host (plist-get server :proxy-host))
