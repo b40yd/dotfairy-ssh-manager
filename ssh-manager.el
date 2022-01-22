@@ -34,24 +34,36 @@
 (require 'f)
 (require 'dired)
 (require 'subr-x)
+(require 'auth-source)
 
-(defcustom ssh-manager-sessions '()
-  "Set SSH connect session."
-  :group 'ssh-manager
-  :type '((:session-name "demo"
-           :kind "proxy"
-           :proxy-kind "other"
-           :proxy-host "localhost"
-           :proxy-port "22"
-           :proxy-user "root"
-           :proxy-password ""
-           :remote-host "127.0.0.1"
-           :remote-port "22"
-           :remote-user "root"
-           :remote-password ""
-           :totp-kind "FreeOTP" ; default '(FreeOTP custom)
-           :totp-key ""
-           :totp-message "verification code:")))
+(defcustom ssh-manager-store-dir
+  (or (getenv "SSH_MANAGER_STORE_DIR") (expand-file-name ".ssh" user-emacs-directory))
+  "Filename of the password-store folder."
+  :type 'directory
+  :version "27.1")
+
+(defun ssh-manager-entries ()
+  "Return a list of all password store entries."
+  (let ((store-dir (expand-file-name ssh-manager-store-dir)))
+    (mapcar
+     (lambda (file) (file-name-sans-extension (file-relative-name file store-dir)))
+     (directory-files-recursively store-dir "\\.gpg\\'"))))
+
+(defun ssh-manager--lookup-secret (entry)
+  (if entry
+      (funcall (plist-get (car entry) :secret))
+    nil))
+
+(defun ssh-manager-sources ()
+  (let ((entries (ssh-manager-entries)))
+    (dolist (e entries)
+      (push (format "%s/%s.gpg" ssh-manager-store-dir e) auth-sources))))
+
+(defun ssh-manager-get-entry (name)
+  (let ((entry (auth-source-search :host name)))
+    (if entry
+        entry
+      nil)))
 
 (defcustom ssh-manager-totp-hooks '((:name "FreeOTP"
                                      :function (lambda (&rest args)
@@ -77,11 +89,11 @@
 
 (defun ssh-manager-lookup-totp-func (name &rest args)
   "Lookup TOTP hook function.
-Argument NAME TOTP kind name.
-Optional argument ARGS TOTP handler function args."
+  Argument NAME TOTP kind name.
+  Optional argument ARGS TOTP handler function args."
   (let ((fun nil))
     (dolist (hook ssh-manager-totp-hooks)
-      (if (string= name  (plist-get hook :name))
+      (if (string= name (plist-get hook :name))
           (setq fun (plist-get hook :function))))
     (if (not (equal fun nil))
         (apply fun args))))
@@ -119,7 +131,7 @@ Optional argument ARGS TOTP handler function args."
 
 (defun ssh-manager--remove-buffer-name-from-groups (buf-name)
   "Remove buffer name from groups.
-Argument BUF-NAME select buffer name."
+  Argument BUF-NAME select buffer name."
 
   (setf (ssh-manager-session-groups-servers (ssh-manager-session-groups))
         (-remove-item buf-name (ssh-manager-session-groups-servers (ssh-manager-session-groups)))))
@@ -210,8 +222,8 @@ Argument BUF-NAME select buffer name."
 
 (defun ssh-manager--message  (format &rest args)
   "Wapper for message.
-Argument FORMAT format.
-Optional argument ARGS."
+  Argument FORMAT format.
+  Optional argument ARGS."
   (when ssh-manager--show-message
     (let ((inhibit-message (and (minibufferp)
                                 (version< emacs-version "27.0"))))
@@ -235,8 +247,8 @@ Optional argument ARGS."
 
 (defun ssh-manager--persist (file-name to-persist)
   "Persist TO-PERSIST in FILE-NAME.
-This function creates the parent directories if they don't exist
-yet."
+  This function creates the parent directories if they don't exist
+  yet."
   (let ((print-length nil)
         (print-level nil))
     ;; Create all parent directories:
@@ -298,7 +310,7 @@ yet."
     ("M-," . term-send-raw)
     ("M-." . comint-dynamic-complete))
   "The key alist that will need to be bind.
-If you do not like default setup, modify it, with (KEY . COMMAND) format."
+  If you do not like default setup, modify it, with (KEY . COMMAND) format."
   :type 'alist
   :group 'ssh-manager)
 
@@ -309,7 +321,7 @@ If you do not like default setup, modify it, with (KEY . COMMAND) format."
 
 (defun ssh-manager-term-send-return ()
   "Use `term-send-raw-string' \\C\\-m instead `term-send-input'.
-Because `term-send-input' have bug that will duplicate input when you \\C\\-a and \\C\\-m in terminal."
+  Because `term-send-input' have bug that will duplicate input when you \\C\\-a and \\C\\-m in terminal."
   (interactive)
   (term-send-raw-string "\C-m"))
 
@@ -330,7 +342,7 @@ Because `term-send-input' have bug that will duplicate input when you \\C\\-a an
 
 (defun ssh-manager-keystroke-setup ()
   "Keystroke setup of `term-char-mode'.
-By default, the key bindings of `term-char-mode' conflict with user's keystroke.
+  By default, the key bindings of `term-char-mode' conflict with user's keystroke.
   So this function unbinds some keys with `term-raw-map',
   and binds some keystroke with `term-raw-map'."
   (let (bind-key bind-command)
@@ -356,7 +368,7 @@ By default, the key bindings of `term-char-mode' conflict with user's keystroke.
 
 (defun ssh-manager--init-term-mode (term-name)
   "Init term mode.
-Argument TERM-NAME set name."
+  Argument TERM-NAME set name."
   (remove-hook 'term-mode-hook 'ssh-manager-keystroke-setup)
   (add-hook 'term-mode-hook 'ssh-manager-keystroke-setup)
   (term-mode)
@@ -380,17 +392,17 @@ Argument TERM-NAME set name."
 ;; sudo yum install sshpass
 (defun ssh-manager-connect-ssh (server)
   "Connect to remote SERVER."
-  (let* ((session-name (plist-get server :session-name))
+  (let* ((session-name (plist-get server :host))
          (kind (intern (plist-get server :kind)))
-         (username (plist-get server :remote-user))
+         (username (plist-get server :user))
          (password (if (string= kind "proxy")
                        (plist-get server :proxy-password)
-                     (plist-get server :remote-password)))
-         (port (plist-get server :remote-port))
-         (host (plist-get server :remote-host))
+                     (ssh-manager--lookup-secret server)))
+         (port (plist-get server :port))
+         (host (plist-get server :realhost))
          (totp-key (ssh-manager-lookup-totp-func (plist-get server :totp-kind)
                                                  (plist-get server :totp-key)))
-         (totp-message (if (string-empty-p (plist-get server :totp-message))
+         (totp-message (if (eq (plist-get server :totp-message) nil)
                            ""
                          (format "%s" (plist-get server :totp-message))))
          (proxy-kind (plist-get server :proxy-kind))
@@ -408,19 +420,19 @@ Argument TERM-NAME set name."
                    cmd "ssh"))
             ((or (string= proxy-kind nil)
                  (string= proxy-kind "other"))
-             (if (not (string-empty-p password))
+             (if (not (string= password nil))
                  (setq argv (append argv `("-p" ,password))))
              (if (not (string= totp-key nil))
                  (setq argv (append argv `("-o" ,totp-key))))
-             (if (not (string-empty-p totp-message))
+             (if (not (string= totp-message nil))
                  (setq argv (append argv `("-O" ,totp-message))))
              (setq argv (append argv `("ssh" "-o" "StrictHostKeychecking=no")))
-             (if (not (string-empty-p username))
+             (if (not (string= username nil))
                  (setq username (format "%s@" username)))
-             (if (not (string-empty-p host))
+             (if (not (string= host nil))
                  (setq argv (append argv `(,(format "%s%s" username host))))
                (ssh-manager--error "SSH hostname must be set. it cannot empty. "))
-             (if (not (string-empty-p port))
+             (if (not (string= port nil))
                  (setq argv (append argv `("-p" ,port))))
              (if (and (string= kind "proxy")
                       (not (string= proxy-host nil))
@@ -447,7 +459,7 @@ Argument TERM-NAME set name."
 
 (defun ssh-manager--send-cmd-to-buffer (&optional buffer string)
   "Send STRING to a shell process associated with BUFFER.
-By default, BUFFER is \"*terminal*\" and STRING is empty."
+  By default, BUFFER is \"*terminal*\" and STRING is empty."
   (let ((process (get-buffer-process (or buffer "*terminal*"))))
     (when (process-live-p process)
       (with-current-buffer (process-buffer process)
@@ -459,180 +471,21 @@ By default, BUFFER is \"*terminal*\" and STRING is empty."
                  (term-send-string process input)
                  (term-send-input))))))))
 
-(defun ssh-manager--filter-ssh-session ()
-  "Filter SSH session name list."
-  (let ((lst '()))
-    (dolist (server (->> (ssh-manager-session)
-                         (ssh-manager-session-servers)))
-      (setq lst (append lst (list (plist-get server :session-name)))))
-    (dolist (server ssh-manager-sessions)
-      (setq lst (append lst (list (plist-get server :session-name)))))
-    lst))
 
 ;;;###autoload
 (defun ssh-manager-switch-to-server (session)
   "Select SSH server to connect.
-Argument SESSION server session info."
+  Argument SESSION server session info."
   (interactive (list (completing-read "Select server to connect: "
-                                      (ssh-manager--filter-ssh-session))))
-  (let ((connect '()))
-    (dolist (server (->> (ssh-manager-session)
-                         (ssh-manager-session-servers)))
-      (if (equal (plist-get server :session-name) session)
-          (setq connect server)))
+                                      (ssh-manager-entries))))
+  (if session
+      (ssh-manager-connect-ssh (car (ssh-manager-get-entry session)))))
 
-    (if (equal connect nil)
-        (dolist (server ssh-manager-sessions)
-          (if (equal (plist-get server :session-name) session)
-              (setq connect server))))
-
-    (if (not (equal connect nil))
-        (ssh-manager-connect-ssh connect))))
-
-(defun ssh-manager--read-session-config-from-minibuffer (&optional ssh-session-config)
-  "Read session config from minibuffer.
-Optional argument SSH-SESSION-CONFIG set session config."
-  (let* ((ssh-session '())
-         (session-name (read-string "Session Name: " (if (not (equal ssh-session-config nil))
-                                                         (plist-get ssh-session-config :session-name)))))
-    (if (string-empty-p session-name)
-        (ssh-manager--error "Session name cannot empty. ")
-      (let* ((kind (completing-read "Select connect style: " '(proxy direct)))
-             (proxy-kind (if (string= kind 'proxy)
-                             (completing-read "Select proxy kind: " '("other" "jumpserver"))))
-             (proxy-host (if (string= kind 'proxy)
-                             (read-string "Proxy hostname: "
-                                          (if (not (equal ssh-session-config nil))
-                                              (plist-get ssh-session-config :proxy-host)))
-                           ""))
-             (proxy-port (if (string= kind 'proxy)
-                             (read-string "Proxy port(22): "
-                                          (if (not (equal ssh-session-config nil))
-                                              (plist-get ssh-session-config :proxy-port)))
-                           "22"))
-             (proxy-user (if (string= kind 'proxy)
-                             (read-string "Proxy username(root): "
-                                          (if (not (equal ssh-session-config nil))
-                                              (plist-get ssh-session-config :proxy-user)))
-                           ""))
-             (proxy-password (if (and (string= kind 'proxy)
-                                      (not (string= proxy-kind "jumpserver")))
-                                 (read-passwd "Proxy password: "
-                                              (if (not (equal ssh-session-config nil))
-                                                  (plist-get ssh-session-config :proxy-password)))
-                               ""))
-             (remote-host (read-string "Remote hostname(127.0.0.1): " (if (not (equal ssh-session-config nil))
-                                                                          (plist-get ssh-session-config :remote-host))))
-             (remote-port (read-string "Remote hostport(22): " (if (not (equal ssh-session-config nil))
-                                                                   (plist-get ssh-session-config :remote-port))))
-             (remote-user (read-string "Remote username(root): " (if (not (equal ssh-session-config nil))
-                                                                     (plist-get ssh-session-config :remote-user))))
-             (remote-password (if (not (string= proxy-kind "jumpserver"))
-                                  (read-passwd "Remote password: ")))
-             (totp-enable (y-or-n-p "Are you use TOTP? "))
-             (totp-kind (if totp-enable
-                            (completing-read "Select TOTP kind: "
-                                             (ssh-manager--all-totp-name))))
-             (totp-key (if totp-enable
-                           (read-passwd "2FA(TOTP) key: " (if (not (equal ssh-session-config nil))
-                                                              (plist-get ssh-session-config :totp-key)))
-                         ""))
-             (totp-message (if totp-enable
-                               (read-string "2FA(TOTP) message: " (if (not (equal ssh-session-config nil))
-                                                                      (plist-get ssh-session-config :totp-message)))
-                             "")))
-        (setq ssh-session
-              `(:session-name ,session-name
-                :kind ,kind
-                :proxy-kind ,proxy-kind
-                :proxy-host ,proxy-host
-                :proxy-port ,(if (string-empty-p proxy-port)
-                                 "22"
-                               proxy-port)
-                :proxy-user ,(if (string-empty-p proxy-user)
-                                 "root"
-                               proxy-user)
-                :proxy-password ,(if (and (string-empty-p proxy-password)
-                                          (string= kind 'proxy)
-                                          (not (string= proxy-kind "jumpserver")))
-                                     (ssh-manager--error "Proxy connect password cannot empty. ")
-                                   proxy-password)
-                :remote-host ,remote-host
-                :remote-port ,(if (string-empty-p remote-port)
-                                  "22"
-                                remote-port)
-                :remote-user ,(if (string-empty-p remote-user)
-                                  "root"
-                                remote-user)
-                :remote-password ,remote-password
-                :totp-kind ,totp-kind
-                :totp-key ,totp-key
-                :totp-message ,totp-message))))
-    ssh-session))
-
-;;;###autoload
-(defun ssh-manager-create-ssh-remote ()
-  "Create and connect SSH session."
-  (interactive)
-  (let* ((ssh-session (ssh-manager--read-session-config-from-minibuffer)))
-    (cl-pushnew ssh-session
-                (ssh-manager-session-servers (ssh-manager-session)) :test 'equal)
-    (ssh-manager--persist-session (ssh-manager-session))
-    (cond ((string= (plist-get ssh-session :kind) 'proxy)
-           (if (or (string-empty-p (plist-get ssh-session :proxy-host))
-                   (string-empty-p (plist-get ssh-session :remote-host)))
-               (ssh-manager--error "<Proxy host> and <Remote host> must be set. please check it. ")
-             (ssh-manager-connect-ssh ssh-session)))
-          ((string= (plist-get ssh-session :kind) 'direct)
-           (if (string-empty-p (plist-get ssh-session :remote-host))
-               (ssh-manager--error "<Remote host> must be set. it cannot empty. ")
-             (ssh-manager-connect-ssh ssh-session))))))
-
-;;;###autoload
-(defun ssh-manager-edit-ssh-session-config (session)
-  "Edit SSH SESSION config."
-  (interactive (list (completing-read "Select server to edit: "
-                                      (ssh-manager--filter-ssh-session))))
-
-  (let* ((let-sessions (ssh-manager-session))
-         (let-server nil))
-    (dolist (server (->> let-sessions
-                         (ssh-manager-session-servers)))
-      (if (string= session (plist-get server :session-name))
-          (setq let-server server)))
-    (cl-pushnew (ssh-manager--read-session-config-from-minibuffer let-server)
-                (ssh-manager-session-servers let-sessions) :test 'equal)
-    (setf (ssh-manager-session-servers let-sessions)
-          (-remove-item let-server (ssh-manager-session-servers let-sessions)))
-    (ssh-manager--persist-session let-sessions)))
-
-;;;###autoload
-(defun ssh-manager-remove-ssh-server (session)
-  "Remove SESSION from the list of servers."
-  (interactive (list (completing-read "Select server to connect: "
-                                      (ssh-manager--filter-ssh-session))))
-  (dolist (server (->> (ssh-manager-session)
-                       (ssh-manager-session-servers)))
-    (if (string= session (plist-get server :session-name))
-        (let* ((let-sessions (ssh-manager-session)))
-          (setf (ssh-manager-session-servers let-sessions)
-                (-remove-item server (ssh-manager-session-servers let-sessions)))
-          (ssh-manager--persist-session (ssh-manager-session))))))
-
-;;;###autoload
-(defun ssh-manager-remove-history-file-from-ssh-server (history)
-  "Remove HISTORY file from the list of folders."
-  (interactive (list (completing-read "Select remove from folders: "
-                                      (ssh-manager-session-folders (ssh-manager-session)))))
-  (let* ((let-sessions (ssh-manager-session)))
-    (setf (ssh-manager-session-folders let-sessions)
-          (-remove-item history (ssh-manager-session-folders let-sessions)))
-    (ssh-manager--persist-session (ssh-manager-session))))
-
-(defcustom ssh-manager-sshpass-path (expand-file-name (concat user-emacs-directory "sshpass"))
+(defcustom ssh-manager-sshpass-path (expand-file-name "sshpass" user-emacs-directory)
   "Set SSH connect session."
   :group 'ssh-manager
   :type 'string)
+
 (defvar ssh-manager-sshpass-bin (concat ssh-manager-sshpass-path "/bin/sshpass"))
 
 ;;;###autoload
@@ -658,13 +511,6 @@ Optional argument SSH-SESSION-CONFIG set session config."
       (ssh-manager--info "your need install oathtool if used 2FA."))
   (ssh-manager--info "installed."))
 
-(defun ssh-manager--replace-in-string (what with in)
-  "Replace substring.
-Argument WHAT regexp.
-Argument WITH string.
-Argument IN substring."
-  (replace-regexp-in-string (regexp-quote what) with in nil 'literal))
-
 ;;;###autoload
 (defun ssh-manager-exec-process (command &rest args)
   "Execute COMMAND with ARGS synchronously.
@@ -676,7 +522,7 @@ synchronously without sacrificing their output.
 
 Warning: freezes indefinitely on any stdin prompt."
   ;; FIXME Is there any way to handle prompts?
-  (ssh-manager--info (mapconcat 'identity args " "))
+  ;; (ssh-manager--info (mapconcat 'identity args " "))
   (with-temp-buffer
     (cons (let ((process
                  (make-process :name "ssh-manager"
@@ -706,7 +552,7 @@ Argument CMD use rsync or scp."
          (kind (plist-get server :kind))
          (password (if (string= kind 'proxy)
                        (plist-get server :proxy-password)
-                     (plist-get server :remote-password)))
+                     (ssh-manager--lookup-secret server)))
          (totp-kind (plist-get server :totp-kind))
          (totp-key (if (or (null totp-kind)
                            (string= totp-kind ""))
@@ -718,40 +564,40 @@ Argument CMD use rsync or scp."
          (proxy-host (plist-get server :proxy-host))
          (proxy-port (plist-get server :proxy-port))
          (proxy-user (plist-get server :proxy-user))
-         (host (plist-get server :remote-host))
-         (port (plist-get server :remote-port))
-         (user (plist-get server :remote-user)))
+         (host (plist-get server :realhost))
+         (port (plist-get server :port))
+         (user (plist-get server :user)))
     (if (or (string= proxy-kind nil)
             (string= proxy-kind "other"))
         (progn
-          (if (not (string-empty-p password))
+          (if (not (string= password nil))
               (setq argv (append argv `(,ssh-manager-sshpass-bin "-p" ,password))))
-          (if (not (string-empty-p totp-key))
+          (if (not (string= totp-key nil))
               (setq argv (append argv `("-o" ,totp-key))))
-          (if (not (string-empty-p totp-message))
+          (if (not (string= totp-message nil))
               (setq argv (append argv `("-O" ,(format "'%s'" totp-message)))))))
     (cond ((string= cmd "rsync")
            (if (string= kind 'proxy)
                (setq argv (append argv `("ssh" "-o" "'StrictHostKeychecking=no'" "-J" ,(format "%s@%s:%s" proxy-user proxy-host proxy-port))))
              (setq argv (append argv `("ssh" "-o" "'StrictHostKeychecking=no'"))))
-           (if (not (string-empty-p port))
+           (if (not (string= port nil))
                (setq argv (append argv `("-p" ,port))))
            (setq argv (list cmd "-r" "-P" (concat "-e \"" (mapconcat 'identity argv " ") "\""))))
           ((string= cmd "scp")
-           (if (string-empty-p host)
+           (if (string= host nil)
                (ssh-manager--error "SSH hostname must be set. HOST cannot empty. ")
              (setq argv (append argv `(,cmd "-r" "-o" "StrictHostKeychecking=no")))
              (if (string= kind 'proxy)
                  (setq argv (append argv `("-J" ,(format "%s@%s:%s" proxy-user proxy-host proxy-port)))))
-             (if (not (string-empty-p port))
+             (if (not (string= port nil))
                  (setq argv (append argv `("-P" ,port)))))))
-    (if (and (not (string-empty-p host))
-             (not (string-empty-p user)))
+    (if (and (not (string= host nil))
+             (not (string= user nil)))
         (let* ((remote-dir-or-file (completing-read (format "Set remote file path (/home/%s): " user)
                                                     (ssh-manager-session-folders (ssh-manager-session))
                                                     nil nil))
                (target nil))
-          (if (string-empty-p remote-dir-or-file)
+          (if (string= remote-dir-or-file nil)
               (setq remote-dir-or-file (format "/home/%s" user)))
           (cl-pushnew remote-dir-or-file (ssh-manager-session-folders (ssh-manager-session)) :test 'equal)
           (ssh-manager--persist-session (ssh-manager-session))
@@ -773,23 +619,22 @@ Argument CMD use rsync or scp."
 Argument METHOD select download or upload."
   (interactive (list (completing-read "Select upload or download: "
                                       '(upload download))))
-  (let ((session-name (completing-read "Select connect to server: "
-                                       (ssh-manager--filter-ssh-session))))
-    (dolist (session (->> (ssh-manager-session)
-                          (ssh-manager-session-servers)))
-      (if (and (string= session-name (plist-get session :session-name))
-               (not (string= (plist-get session :proxy-kind) "jumpserver")))
+  (let ((entry-name (completing-read "Select connect to server: "
+                                     (ssh-manager-entries))))
+    (let ((entry (car (ssh-manager-get-entry entry-name))))
+      (if (and entry
+               (not (string= (plist-get entry :proxy-kind) "jumpserver")))
           (cond ((executable-find "rsync")
-                 (if-let ((argv (ssh-manager--upload-or-download-files session method "rsync")))
+                 (if-let ((argv (ssh-manager--upload-or-download-files entry method "rsync")))
                      (ssh-manager-exec-process "sh" "-c" (mapconcat 'identity argv " "))))
                 ((executable-find "scp")
-                 (if-let ((argv (ssh-manager--upload-or-download-files session method "scp")))
+                 (if-let ((argv (ssh-manager--upload-or-download-files entry method "scp")))
                      (ssh-manager-exec-process "sh" "-c" (mapconcat 'identity argv " ")))))
-        (ssh-manager--error "jumpserver not support download and upload.")))
-    (if (derived-mode-p 'dired-mode)
-        (cond ((string= method "download")
-               (revert-buffer))
-              ((string= method "upload")
-               (dired-unmark-all-marks))))))
+        (ssh-manager--error "jumpserver not support download and upload."))
+      (if (derived-mode-p 'dired-mode)
+          (cond ((string= method "download")
+                 (revert-buffer))
+                ((string= method "upload")
+                 (dired-unmark-all-marks)))))))
 (provide 'ssh-manager)
 ;;; ssh-manager.el ends here
