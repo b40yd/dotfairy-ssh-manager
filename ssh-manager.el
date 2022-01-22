@@ -42,24 +42,31 @@
   :type 'directory
   :version "27.1")
 
+;;;###autoload
 (defun ssh-manager-entries ()
   "Return a list of all password store entries."
+  (interactive)
   (let ((store-dir (expand-file-name ssh-manager-store-dir)))
     (mapcar
      (lambda (file) (file-name-sans-extension (file-relative-name file store-dir)))
      (directory-files-recursively store-dir "\\.gpg\\'"))))
 
 (defun ssh-manager--lookup-secret (entry)
+  "Return `entry' password."
   (if entry
       (funcall (plist-get (car entry) :secret))
     nil))
 
+;;;###autoload
 (defun ssh-manager-sources ()
+  "Set auth-sources."
+  (interactive)
   (let ((entries (ssh-manager-entries)))
     (dolist (e entries)
       (push (format "%s/%s.gpg" ssh-manager-store-dir e) auth-sources))))
 
 (defun ssh-manager-get-entry (name)
+  "Return ssh entry by `name'."
   (let ((entry (auth-source-search :host name)))
     (if entry
         entry
