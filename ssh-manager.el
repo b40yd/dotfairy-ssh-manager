@@ -488,12 +488,16 @@
   (if session
       (ssh-manager-connect-ssh (car (ssh-manager-get-entry session)))))
 
+
 (defcustom ssh-manager-sshpass-path (expand-file-name "sshpass" user-emacs-directory)
-  "Set SSH connect session."
+  "Set sshpass path."
   :group 'ssh-manager
   :type 'string)
 
-(defvar ssh-manager-sshpass-bin (concat ssh-manager-sshpass-path "/bin/sshpass"))
+(defcustom ssh-manager-sshpass-bin (expand-file-name "/bin/sshpass" ssh-manager-sshpass-path)
+  "Set sshpass bin."
+  :group 'ssh-manager
+  :type 'string)
 
 ;;;###autoload
 (defun ssh-manager-install-tools ()
