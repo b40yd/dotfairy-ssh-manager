@@ -54,7 +54,7 @@
 (defun ssh-manager--lookup-secret (entry)
   "Return `entry' password."
   (if entry
-      (funcall (plist-get (car entry) :secret))
+      (funcall (plist-get entry :secret))
     nil))
 
 ;;;###autoload
@@ -494,7 +494,7 @@
   :group 'ssh-manager
   :type 'string)
 
-(defcustom ssh-manager-sshpass-bin (expand-file-name "/bin/sshpass" ssh-manager-sshpass-path)
+(defcustom ssh-manager-sshpass-bin (concat ssh-manager-sshpass-path "/bin/sshpass")
   "Set sshpass bin."
   :group 'ssh-manager
   :type 'string)
