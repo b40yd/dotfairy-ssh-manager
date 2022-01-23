@@ -46,9 +46,25 @@ Now use-package will use `straight.el`.
   (setq ssh-manager-sshpass-path (expand-file-name "sshpass" user-emacs-directory)))
 
 ```
-If you have many server management, it is recommended to use `auth-sources` configuration. If you have TOTP, you may also need to set `ssh-manager-totp-hooks`.
+If you have many server management, it is recommended to use `auth-sources` configuration.
+e.g `~/.emacs.d/.ssh/test.gpg`:
 ```elisp
-host "demo" kind "proxy" proxy-host "localhost" proxy-port "22" proxy-user "root" proxy-password "" realhost "127.0.0.1" port "22" user "root" password "" totp-kind "FreeOTP" ; default '(FreeOTP Custom) totp-key "" totp-message "verification code:"
+host "demo"
+kind "proxy"
+proxy-host "localhost"
+proxy-port "22"
+proxy-user "root"
+proxy-password ""
+realhost "127.0.0.1"
+port "22"
+user "root"
+password ""
+totp-kind "FreeOTP"
+totp-key ""
+totp-message "verification code:"
+```
+If you have `TOTP`, you may also need to set `ssh-manager-totp-hooks`.
+```elisp
 ;; eg. default custom totp-hooks
 (setq ssh-manager-totp-hooks '((:name "Custom"
     :function (lambda (totp-key)
