@@ -36,11 +36,21 @@
 (require 'subr-x)
 (require 'auth-source)
 
+(defcustom ssh-manager-sshpass-path (expand-file-name "sshpass" user-emacs-directory)
+  "Set sshpass path."
+  :group 'ssh-manager
+  :type 'string)
+
+(defcustom ssh-manager-sshpass-bin (concat ssh-manager-sshpass-path "/bin/sshpass")
+  "Set sshpass bin."
+  :group 'ssh-manager
+  :type 'string)
+
 (defcustom ssh-manager-store-dir
   (or (getenv "SSH_MANAGER_STORE_DIR") (expand-file-name ".ssh" user-emacs-directory))
   "Filename of the password-store folder."
-  :type 'directory
-  :version "27.1")
+  :group 'ssh-manager
+  :type 'directory)
 
 ;;;###autoload
 (defun ssh-manager-entries ()
@@ -492,17 +502,6 @@
                                       (ssh-manager-entries))))
   (if session
       (ssh-manager-connect-ssh (car (ssh-manager-get-entry session)))))
-
-
-(defcustom ssh-manager-sshpass-path (expand-file-name "sshpass" user-emacs-directory)
-  "Set sshpass path."
-  :group 'ssh-manager
-  :type 'string)
-
-(defcustom ssh-manager-sshpass-bin (concat ssh-manager-sshpass-path "/bin/sshpass")
-  "Set sshpass bin."
-  :group 'ssh-manager
-  :type 'string)
 
 ;;;###autoload
 (defun ssh-manager-install-tools ()
