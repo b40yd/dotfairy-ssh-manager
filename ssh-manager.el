@@ -46,6 +46,22 @@
   :group 'ssh-manager
   :type 'string)
 
+(defcustom ssh-manager-sources '("~/.authinfo" "~/.authinfo.gpg" "~/.netrc")
+  "List of authentication sources.
+Each entry is the authentication type with optional properties.
+Entries are tried in the order in which they appear.
+See Info node `(auth)Help for users' for details.
+
+If an entry names a file with the \".gpg\" extension and you have
+EPA/EPG set up, the file will be encrypted and decrypted
+automatically.  See Info node `(epa)Encrypting/decrypting gpg files'
+for details.
+
+It's best to customize this with `\\[customize-variable]' because the choices
+can get pretty complex."
+  :group 'ssh-manager
+  :type 'list)
+
 (defcustom ssh-manager-store-dir
   (or (getenv "SSH_MANAGER_STORE_DIR") (expand-file-name ".ssh" user-emacs-directory))
   "Filename of the password-store folder."
@@ -77,10 +93,14 @@
 
 (defun ssh-manager-get-entry (name)
   "Return ssh entry by `name'."
-  (let ((entry (auth-source-search :host name)))
-    (if entry
-        entry
-      nil)))
+  (let ((sources (mapcar #'copy-sequence ssh-manager-sources)))
+    (if (not (string-empty-p name))
+        (push (format "%s/%s.gpg" ssh-manager-store-dir name) sources))
+    (setq auth-sources sources)
+    (let ((entry (auth-source-search :host name)))
+      (if entry
+          entry
+        nil))))
 
 (defcustom ssh-manager-totp-hooks '((:name "FreeOTP"
                                      :function (lambda (&rest args)
