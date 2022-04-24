@@ -103,18 +103,18 @@ can get pretty complex."
         nil))))
 
 (defcustom ssh-manager-totp-hooks '((:name "FreeOTP"
-                                           :function (lambda (&rest args)
-                                                       (with-temp-buffer
-                                                         (or (apply
-                                                              #'call-process "oathtool" nil t nil `("--totp" "-b" ,@args))
-                                                             "")
-                                                         (string-trim (buffer-string)))))
+                                     :function (lambda (&rest args)
+                                                 (with-temp-buffer
+                                                   (or (apply
+                                                        #'call-process "oathtool" nil t nil `("--totp" "-b" ,@args))
+                                                       "")
+                                                   (string-trim (buffer-string)))))
                                     (:name "Custom"
-                                           :function (lambda (&rest args)
-                                                       (setq args (read-string "Enter TOTP key: ")))))
-"Set totp verification code hook."
-:group 'ssh-manager
-:type 'list)
+                                     :function (lambda (&rest args)
+                                                 (setq args (read-string "Enter TOTP key: ")))))
+  "Set totp verification code hook."
+  :group 'ssh-manager
+  :type 'list)
 
 (defun ssh-manager--all-totp-name ()
   "Lookup all TOTP name."
