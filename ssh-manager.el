@@ -46,7 +46,7 @@
   :group 'ssh-manager
   :type 'string)
 
-(defcustom ssh-manager-sources '("~/.authinfo" "~/.authinfo.gpg" "~/.netrc")
+(defcustom ssh-manager--sources '("~/.authinfo" "~/.authinfo.gpg" "~/.netrc")
   "List of authentication sources.
 Each entry is the authentication type with optional properties.
 Entries are tried in the order in which they appear.
@@ -93,28 +93,28 @@ can get pretty complex."
 
 (defun ssh-manager-get-entry (name)
   "Return ssh entry by `name'."
-  (let ((sources (mapcar #'copy-sequence ssh-manager-sources)))
+  (let ((sources (mapcar #'copy-sequence ssh-manager--sources)))
     (if (not (string-empty-p name))
         (push (format "%s/%s.gpg" ssh-manager-store-dir name) sources))
-    (setq auth-sources sources)
+    (setq-local auth-sources sources)
     (let ((entry (auth-source-search :host name)))
       (if entry
           entry
         nil))))
 
 (defcustom ssh-manager-totp-hooks '((:name "FreeOTP"
-                                     :function (lambda (&rest args)
-                                                 (with-temp-buffer
-                                                   (or (apply
-                                                        #'call-process "oathtool" nil t nil `("--totp" "-b" ,@args))
-                                                       "")
-                                                   (string-trim (buffer-string)))))
+                                           :function (lambda (&rest args)
+                                                       (with-temp-buffer
+                                                         (or (apply
+                                                              #'call-process "oathtool" nil t nil `("--totp" "-b" ,@args))
+                                                             "")
+                                                         (string-trim (buffer-string)))))
                                     (:name "Custom"
-                                     :function (lambda (&rest args)
-                                                 (setq args (read-string "Enter TOTP key: ")))))
-  "Set totp verification code hook."
-  :group 'ssh-manager
-  :type 'list)
+                                           :function (lambda (&rest args)
+                                                       (setq args (read-string "Enter TOTP key: ")))))
+"Set totp verification code hook."
+:group 'ssh-manager
+:type 'list)
 
 (defun ssh-manager--all-totp-name ()
   "Lookup all TOTP name."
