@@ -97,7 +97,7 @@ can get pretty complex."
   :type 'boolean
   :group 'ssh-manager)
 
-(defun docker--running-containers ()
+(defun ssh-manager-docker--running-containers ()
   "Collect docker running containers.
 
 Return a list of containers of the form: \(ID NAME\)"
@@ -122,7 +122,7 @@ Return a list of containers of the form: \(ID NAME\)"
         (if host
             (push (concat "sshx" ":" user host) hosts))))
     ;; Docker
-    (dolist (cand (cl-loop for (id name) in (docker--running-containers)
+    (dolist (cand (cl-loop for (id name) in (ssh-manager-docker--running-containers)
                            collect (list "" (if ssh-manager-docker-use-names name id))))
       (let ((user (if (not (string-empty-p (car cand)))
                       (concat (car cand) "@")))
@@ -587,13 +587,15 @@ Return a list of containers of the form: \(ID NAME\)"
   Argument SESSION server session info."
   (interactive (list (completing-read "Select server to connect: "
                                       (ssh-manager-entries))))
-  (let ((result (split-string session ":")))
-    (cond ((string= (car result) "gpg")
-           (ssh-manager-connect-ssh (car (ssh-manager-get-entry session))))
-          ((string= (car result) "sshx")
-           (ssh-manager--call "ssh" (cadr result) (cadr result)))
-          ((string= (car result) "docker")
-           (ssh-manager--call "docker" (cadr result) "exec" "-it" (cadr result) "sh")))))
+  (let* ((result (split-string session ":"))
+         (ssh-method (car result))
+         (ssh-hostname (cadr result)))
+    (cond ((string= ssh-method "gpg")
+           (ssh-manager-connect-ssh (car (ssh-manager-get-entry ssh-hostname))))
+          ((string= ssh-method "sshx")
+           (ssh-manager--call "ssh" ssh-hostname ssh-hostname))
+          ((string= ssh-method "docker")
+           (ssh-manager--call "docker" ssh-hostname "exec" "-it" ssh-hostname "sh")))))
 
 ;;;###autoload
 (defun ssh-manager-install-tools ()
@@ -730,37 +732,38 @@ Argument METHOD select download or upload."
                                      (ssh-manager-entries))))
 
     (let* ((result (split-string entry-name ":"))
-           (argv (if (not (string= (car result) "gpg"))
+           (ssh-method (car result))
+           (ssh-hostname (cadr result))
+           (argv (if (not (string= ssh-method "gpg"))
                      (if (string= method "upload")
                          (list (completing-read "Set local file path (~/): " nil nil nil)
                                (concat (cadr result) ":" (completing-read "Set remote file path (~/): " nil nil nil)))
                        (list (concat (cadr result) ":" (completing-read "Set remote file path (~/): " nil nil nil))
                              (completing-read "Set local file path (~/): " nil nil nil)))
                    nil)))
-      (cond ((string= (car result) "gpg")
-             (let ((entry (car (ssh-manager-get-entry entry-name))))
-               (if (and entry
-                        (not (string= (plist-get entry :proxy-kind) "jumpserver")))
-                   (cond ((executable-find "rsync")
-                          (if-let ((argv (ssh-manager--upload-or-download-files entry method "rsync")))
-                              (ssh-manager-exec-process "sh" "-c" (mapconcat 'identity argv " "))))
-                         ((executable-find "scp")
-                          (if-let ((argv (ssh-manager--upload-or-download-files entry method "scp")))
-                              (ssh-manager-exec-process "sh" "-c" (mapconcat 'identity argv " ")))))
-                 (ssh-manager--error "jumpserver not support download and upload."))
-               (if (derived-mode-p 'dired-mode)
-                   (cond ((string= method "download")
-                          (revert-buffer))
-                         ((string= method "upload")
-                          (dired-unmark-all-marks))))))
-            ((string= (car result) "sshx")
+      (cond ((string= ssh-method "gpg")
+             (let ((entry (car (ssh-manager-get-entry ssh-hostname)))
+                   (if (and entry
+                            (not (string= (plist-get entry :proxy-kind) "jumpserver")))
+                       (cond ((executable-find "rsync")
+                              (if-let ((argv (ssh-manager--upload-or-download-files entry method "rsync")))
+                                  (ssh-manager-exec-process "sh" "-c" (mapconcat 'identity argv " "))))
+                             ((executable-find "scp")
+                              (if-let ((argv (ssh-manager--upload-or-download-files entry method "scp")))
+                                  (ssh-manager-exec-process "sh" "-c" (mapconcat 'identity argv " ")))))
+                     (ssh-manager--error "jumpserver not support download and upload."))
+                   (if (derived-mode-p 'dired-mode)
+                       (cond ((string= method "download")
+                              (revert-buffer))
+                             ((string= method "upload")
+                              (dired-unmark-all-marks)))))))
+            ((string= ssh-method "sshx")
              (cond ((executable-find "rsync")
                     (ssh-manager-exec-process "sh" "-c" (mapconcat 'identity
                                                                    (append '("rsync" "-avz" "-r" "--progress" "--delete") argv) " ")))
                    ((executable-find "scp")
                     (ssh-manager-exec-process "sh" "-c" (mapconcat 'identity (append '("scp" "-r") argv) " ")))))
-            ((string= (car result) "docker")
-             (ssh-manager-exec-process "sh" "-c" (mapconcat 'identity (append '("docker" "cp" "-q") argv) " "))))
-      )))
+            ((string= ssh-method "docker")
+             (ssh-manager-exec-process "sh" "-c" (mapconcat 'identity (append '("docker" "cp" "-q") argv) " ")))))))
 (provide 'ssh-manager)
 ;;; ssh-manager.el ends here
