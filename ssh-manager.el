@@ -35,6 +35,7 @@
 (require 'dired)
 (require 'subr-x)
 (require 'auth-source)
+(require 'tramp)
 
 (defcustom ssh-manager-sshpass-path (expand-file-name "sshpass" user-emacs-directory)
   "Set sshpass path."
@@ -45,6 +46,18 @@
   "Set sshpass bin."
   :group 'ssh-manager
   :type 'string)
+
+
+(defcustom ssh-manager-ssh-config (expand-file-name "~/.ssh/config")
+  "Set ssh config."
+  :group 'ssh-manager
+  :type 'string)
+
+(defcustom ssh-manager-known-hosts (expand-file-name "~/.ssh/known_hosts")
+  "Set ssh config."
+  :group 'ssh-manager
+  :type 'string)
+
 
 (defcustom ssh-manager--sources '("~/.authinfo" "~/.authinfo.gpg" "~/.netrc")
   "List of authentication sources.
@@ -68,14 +81,54 @@ can get pretty complex."
   :group 'ssh-manager
   :type 'directory)
 
+(defun ssh-manager--gpg-config ()
+  "get gpg configs."
+  (let ((store-dir (expand-file-name ssh-manager-store-dir))
+        (default '()))
+    (if (file-directory-p store-dir)
+        (mapcar
+         (lambda (file) (concat "gpg"
+                           ":" (file-name-sans-extension (file-relative-name file store-dir))))
+         (directory-files-recursively store-dir "\\.gpg\\'"))
+      default)))
+
+(defcustom ssh-manager-docker-use-names t
+  "Whether use names instead of id."
+  :type 'boolean
+  :group 'ssh-manager)
+
+(defun docker--running-containers ()
+  "Collect docker running containers.
+
+Return a list of containers of the form: \(ID NAME\)"
+  (cl-loop for line in (cdr (ignore-errors (apply #'process-lines "docker"  (list "ps"))))
+           for info = (split-string line "[[:space:]]+" t)
+           collect (cons (car info) (last info))))
+
 ;;;###autoload
 (defun ssh-manager-entries ()
   "Return a list of all password store entries."
   (interactive)
-  (let ((store-dir (expand-file-name ssh-manager-store-dir)))
-    (mapcar
-     (lambda (file) (file-name-sans-extension (file-relative-name file store-dir)))
-     (directory-files-recursively store-dir "\\.gpg\\'"))))
+  (let ((hosts (ssh-manager--gpg-config)))
+    (dolist (cand (tramp-parse-sconfig ssh-manager-ssh-config))
+      (let ((user (if (car cand) (concat (car cand) "@")))
+            (host (car (cdr cand))))
+        (if host
+            (push (concat "sshx" ":" user host) hosts))))
+    ;; Known hosts
+    (dolist (cand (tramp-parse-shosts ssh-manager-known-hosts))
+      (let ((user (if (car cand) (concat (car cand) "@")))
+            (host (car (cdr cand))))
+        (if host
+            (push (concat "sshx" ":" user host) hosts))))
+    ;; Docker
+    (dolist (cand (cl-loop for (id name) in (docker--running-containers)
+                           collect (list "" (if ssh-manager-docker-use-names name id))))
+      (let ((user (if (not (string-empty-p (car cand)))
+                      (concat (car cand) "@")))
+            (host (car (cdr cand))))
+        (push (concat "docker:" user host) hosts)))
+    (reverse hosts)))
 
 (defun ssh-manager--lookup-secret (entry)
   "Return `entry' password."
@@ -89,7 +142,9 @@ can get pretty complex."
   (interactive)
   (let ((entries (ssh-manager-entries)))
     (dolist (e entries)
-      (push (format "%s/%s.gpg" ssh-manager-store-dir e) auth-sources))))
+      (let ((result (split-string e ":")))
+        (if (string= (car result) "gpg")
+            (push (format "%s/%s.gpg" ssh-manager-store-dir e) auth-sources))))))
 
 (defun ssh-manager-get-entry (name)
   "Return ssh entry by `name'."
@@ -514,14 +569,31 @@ can get pretty complex."
                  (term-send-input))))))))
 
 
+(defun ssh-manager--call (cmd hostname &rest args)
+  "Call ssh and docker."
+  (let ((index 1))
+    (while (buffer-live-p (get-buffer (format "*%s<%s>*" hostname index)))
+      (setq index (1+ index)))
+    (let ((term-name (format "%s<%s>" hostname index)))
+      (set-buffer (apply 'make-term term-name
+                         cmd
+                         nil
+                         args))
+      (ssh-manager--init-term-mode term-name))))
+
 ;;;###autoload
 (defun ssh-manager-switch-to-server (session)
   "Select SSH server to connect.
   Argument SESSION server session info."
   (interactive (list (completing-read "Select server to connect: "
                                       (ssh-manager-entries))))
-  (if session
-      (ssh-manager-connect-ssh (car (ssh-manager-get-entry session)))))
+  (let ((result (split-string session ":")))
+    (cond ((string= (car result) "gpg")
+           (ssh-manager-connect-ssh (car (ssh-manager-get-entry session))))
+          ((string= (car result) "sshx")
+           (ssh-manager--call "ssh" (cadr result) (cadr result)))
+          ((string= (car result) "docker")
+           (ssh-manager--call "docker" (cadr result) "exec" "-it" (cadr result) "sh")))))
 
 ;;;###autoload
 (defun ssh-manager-install-tools ()
@@ -656,20 +728,39 @@ Argument METHOD select download or upload."
                                       '(upload download))))
   (let ((entry-name (completing-read "Select connect to server: "
                                      (ssh-manager-entries))))
-    (let ((entry (car (ssh-manager-get-entry entry-name))))
-      (if (and entry
-               (not (string= (plist-get entry :proxy-kind) "jumpserver")))
-          (cond ((executable-find "rsync")
-                 (if-let ((argv (ssh-manager--upload-or-download-files entry method "rsync")))
-                     (ssh-manager-exec-process "sh" "-c" (mapconcat 'identity argv " "))))
-                ((executable-find "scp")
-                 (if-let ((argv (ssh-manager--upload-or-download-files entry method "scp")))
-                     (ssh-manager-exec-process "sh" "-c" (mapconcat 'identity argv " ")))))
-        (ssh-manager--error "jumpserver not support download and upload."))
-      (if (derived-mode-p 'dired-mode)
-          (cond ((string= method "download")
-                 (revert-buffer))
-                ((string= method "upload")
-                 (dired-unmark-all-marks)))))))
+
+    (let* ((result (split-string entry-name ":"))
+           (argv (if (not (string= (car result) "gpg"))
+                     (if (string= method "upload")
+                         (list (completing-read "Set local file path (~/): " nil nil nil)
+                               (concat (cadr result) ":" (completing-read "Set remote file path (~/): " nil nil nil)))
+                       (list (concat (cadr result) ":" (completing-read "Set remote file path (~/): " nil nil nil))
+                             (completing-read "Set local file path (~/): " nil nil nil)))
+                   nil)))
+      (cond ((string= (car result) "gpg")
+             (let ((entry (car (ssh-manager-get-entry entry-name))))
+               (if (and entry
+                        (not (string= (plist-get entry :proxy-kind) "jumpserver")))
+                   (cond ((executable-find "rsync")
+                          (if-let ((argv (ssh-manager--upload-or-download-files entry method "rsync")))
+                              (ssh-manager-exec-process "sh" "-c" (mapconcat 'identity argv " "))))
+                         ((executable-find "scp")
+                          (if-let ((argv (ssh-manager--upload-or-download-files entry method "scp")))
+                              (ssh-manager-exec-process "sh" "-c" (mapconcat 'identity argv " ")))))
+                 (ssh-manager--error "jumpserver not support download and upload."))
+               (if (derived-mode-p 'dired-mode)
+                   (cond ((string= method "download")
+                          (revert-buffer))
+                         ((string= method "upload")
+                          (dired-unmark-all-marks))))))
+            ((string= (car result) "sshx")
+             (cond ((executable-find "rsync")
+                    (ssh-manager-exec-process "sh" "-c" (mapconcat 'identity
+                                                                   (append '("rsync" "-avz" "-r" "--progress" "--delete") argv) " ")))
+                   ((executable-find "scp")
+                    (ssh-manager-exec-process "sh" "-c" (mapconcat 'identity (append '("scp" "-r") argv) " ")))))
+            ((string= (car result) "docker")
+             (ssh-manager-exec-process "sh" "-c" (mapconcat 'identity (append '("docker" "cp" "-q") argv) " "))))
+      )))
 (provide 'ssh-manager)
 ;;; ssh-manager.el ends here
