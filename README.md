@@ -70,6 +70,22 @@ If you have `TOTP`, you may also need to set `ssh-manager-totp-hooks`.
     :function (lambda (totp-key)
         (setq totp-key (read-string "Enter TOTP key: "))))))
 ```
+
+Do not use proxy and TOTP, E.g:
+
+```
+host "demo"
+kind ""
+proxy-host ""
+proxy-port "22"
+proxy-user ""
+proxy-password ""
+realhost "120.10.10.10"
+port "22"
+user "root"
+password "meiyoumima"
+```
+
 ## Depends
 - [sshpass](https://github.com/dora38/sshpass.git)
 - oathtool
